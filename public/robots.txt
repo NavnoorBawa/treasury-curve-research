@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://treasury-curve-research.vercel.app/sitemap.xml

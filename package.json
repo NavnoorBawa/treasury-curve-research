@@ -1,0 +1,49 @@
+{
+  "name": "treasury-curve-research",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Institutional U.S. Treasury curve, regime, and year-end research workspace.",
+  "homepage": "https://treasury-curve-research.vercel.app/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NavnoorBawa/treasury-curve-research.git"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm:server\" \"npm:client\"",
+    "client": "vite --host 0.0.0.0",
+    "server": "node --env-file-if-exists=.env.local --watch server/index.js",
+    "build": "tsc -b && vite build",
+    "verify:data": "node scripts/verify-data.mjs",
+    "verify:futures": "node scripts/verify-futures.mjs",
+    "verify:futures:live": "node scripts/verify-futures.mjs --live",
+    "verify:research": "node --no-warnings --experimental-strip-types --experimental-specifier-resolution=node scripts/verify-research.mjs",
+    "verify": "npm run build && npm run verify:research && npm run verify:futures && npm run verify:data",
+    "start": "NODE_ENV=production node --env-file-if-exists=.env.local server/index.js",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.81.5",
+    "compression": "^1.8.0",
+    "csv-parse": "^7.0.1",
+    "express": "^5.1.0",
+    "fast-xml-parser": "^5.2.5",
+    "helmet": "^8.1.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "recharts": "^3.9.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}

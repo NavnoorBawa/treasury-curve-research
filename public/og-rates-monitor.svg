@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="U.S. Treasury Curve Research preview">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#0d100f"/>
+      <stop offset="1" stop-color="#151a18"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-12%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#000000" flood-opacity=".28"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <path d="M0 520c176-88 270-22 408-76 136-53 204-176 370-144 120 23 191 112 422-96v426H0z" fill="#56b9aa" opacity=".05"/>
+
+  <rect x="68" y="66" width="1064" height="498" rx="28" fill="#151a18" stroke="#2b332f" filter="url(#shadow)"/>
+
+  <g transform="translate(108 106)">
+    <rect width="88" height="88" rx="22" fill="#0f2723" stroke="#26564e"/>
+    <rect x="18" y="56" width="8" height="18" rx="4" fill="#56b9aa"/>
+    <rect x="34" y="46" width="8" height="28" rx="4" fill="#56b9aa"/>
+    <rect x="50" y="38" width="8" height="36" rx="4" fill="#8195d2"/>
+    <rect x="66" y="26" width="8" height="48" rx="4" fill="#d09a64"/>
+  </g>
+
+  <text x="226" y="128" fill="#a3ada7" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="25" font-weight="700">Official curve research workspace</text>
+  <text x="226" y="194" fill="#eef1ed" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="56" font-weight="780">U.S. Treasury Curve Research</text>
+  <text x="226" y="244" fill="#a3ada7" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="26">
+    <tspan x="226" y="244">Current CMT yields, Fed H.15 history, curve spreads,</tspan>
+    <tspan x="226" y="280">weekly records, regimes, and a validated year-end baseline.</tspan>
+  </text>
+
+  <g transform="translate(108 312)">
+    <g>
+      <rect width="218" height="112" rx="16" fill="#0f1412" stroke="#2b332f"/>
+      <rect width="4" height="112" rx="2" fill="#56b9aa"/>
+      <text x="26" y="42" fill="#a3ada7" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" font-weight="700">CURRENT CMT</text>
+      <text x="26" y="88" fill="#eef1ed" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="38" font-weight="780">2Y / 5Y</text>
+    </g>
+    <g transform="translate(242)">
+      <rect width="218" height="112" rx="16" fill="#0f1412" stroke="#2b332f"/>
+      <rect width="4" height="112" rx="2" fill="#d0a24c"/>
+      <text x="26" y="42" fill="#a3ada7" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" font-weight="700">CURVE TENORS</text>
+      <text x="26" y="88" fill="#eef1ed" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="35" font-weight="780">10Y / 30Y</text>
+    </g>
+    <g transform="translate(484)">
+      <rect width="218" height="112" rx="16" fill="#0f1412" stroke="#2b332f"/>
+      <rect width="4" height="112" rx="2" fill="#8195d2"/>
+      <text x="26" y="42" fill="#a3ada7" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" font-weight="700">LONG HISTORY</text>
+      <text x="26" y="88" fill="#eef1ed" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="46" font-weight="780">H.15</text>
+    </g>
+    <g transform="translate(726)">
+      <rect width="218" height="112" rx="16" fill="#0f1412" stroke="#2b332f"/>
+      <rect width="4" height="112" rx="2" fill="#c77685"/>
+      <text x="26" y="42" fill="#a3ada7" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" font-weight="700">CURVE REGIMES</text>
+      <text x="26" y="88" fill="#eef1ed" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="38" font-weight="780">6 PAIRS</text>
+    </g>
+  </g>
+
+  <g transform="translate(108 472)">
+    <text x="0" y="34" fill="#a3ada7" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22" font-weight="700">Official U.S. Treasury + Federal Reserve H.15</text>
+    <text x="0" y="72" fill="#6f7974" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18">treasury-curve-research.vercel.app</text>
+    <g transform="translate(620 0)">
+      <path d="M0 22h324M0 56h324M0 90h324" stroke="#2b332f" stroke-width="2" opacity=".72"/>
+      <rect x="22" y="62" width="36" height="28" rx="4" fill="#56b9aa" opacity=".78"/>
+      <rect x="92" y="54" width="36" height="36" rx="4" fill="#d0a24c" opacity=".82"/>
+      <rect x="162" y="38" width="36" height="52" rx="4" fill="#8195d2" opacity=".82"/>
+      <rect x="232" y="22" width="36" height="68" rx="4" fill="#c77685" opacity=".82"/>
+    </g>
+  </g>
+</svg>
