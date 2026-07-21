@@ -11,6 +11,7 @@ import {
 } from "../src/domain/treasury/research.ts";
 import { buildWeeklyCurveResearch } from "../src/domain/treasury/weeklyOutlook.ts";
 import { buildYearEndForecast, estimateDnsFactors } from "../src/domain/treasury/yearEndForecast.ts";
+import { sampleTimeSeriesByExtrema } from "../src/domain/treasury/chartSampling.ts";
 
 const expectedClassifications = [
   [4, -1, "Bull steepening"],
@@ -109,6 +110,19 @@ assert.equal(
 );
 assert.equal(csvRow, "2026-01-02,4.000,4.200,4.500,4.800,20.0,50.0,80.0,30.0,60.0,30.0");
 
+const denseChartSeries = Array.from({ length: 100 }, (_, index) => ({
+  date: `point-${index}`,
+  value: index === 40 ? 500 : index === 60 ? -400 : index,
+  nullable: index >= 70 && index <= 72 ? null : index
+}));
+const sampledChartSeries = sampleTimeSeriesByExtrema(denseChartSeries, ["value", "nullable"], 18);
+assert.ok(sampledChartSeries.length <= 18, "Chart sampling must honor the rendering budget");
+assert.equal(sampledChartSeries[0], denseChartSeries[0], "Chart sampling must retain the first observation");
+assert.equal(sampledChartSeries.at(-1), denseChartSeries.at(-1), "Chart sampling must retain the last observation");
+assert.ok(sampledChartSeries.includes(denseChartSeries[40]), "Chart sampling must retain positive extrema");
+assert.ok(sampledChartSeries.includes(denseChartSeries[60]), "Chart sampling must retain negative extrema");
+assert.ok(sampledChartSeries.some((item) => item.nullable === null), "Chart sampling must retain a source-level null gap");
+
 const syntheticRows = [];
 let syntheticCursor = new Date("2012-01-03T00:00:00Z");
 const syntheticEnd = new Date("2026-07-17T00:00:00Z");
@@ -192,6 +206,7 @@ console.log(
       nonObservationEventRuleVerified: true,
       statisticsVerified: true,
       csvUnitsVerified: true,
+      chartSamplingVerified: true,
       weeklyActualOnlyVerified: true,
       missingObservationRuleVerified: true,
       unpublishedDatesBlankVerified: true,

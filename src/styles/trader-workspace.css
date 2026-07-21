@@ -1634,7 +1634,7 @@ h3 {
   --surface-panel: #ffffff;
   --ink: #171b19;
   --muted: #58615d;
-  --subtle: #79817d;
+  --subtle: #626a66;
   --border: #d9dedb;
   --border-strong: #aeb7b2;
   --brand: #155c50;
@@ -1643,10 +1643,10 @@ h3 {
   --control-active-ink: #ffffff;
   --shadow: none;
   --shadow-hover: none;
-  --text-micro: 10.5px;
-  --text-caption: 11.5px;
-  --text-small: 12.5px;
-  --text-body: 13.5px;
+  --text-micro: 12px;
+  --text-caption: 12px;
+  --text-small: 13px;
+  --text-body: 14px;
 }
 
 :root[data-theme="dark"] {
@@ -1666,6 +1666,33 @@ h3 {
   --control-active-ink: #101613;
 }
 
+.regime-ribbon__selector {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: var(--text-caption);
+  font-weight: 650;
+}
+
+.regime-ribbon__selector select {
+  min-width: 0;
+  min-height: 34px;
+  padding: 5px 30px 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+}
+
+@media (max-width: 520px) {
+  .regime-ribbon__selector {
+    grid-template-columns: 1fr;
+  }
+}
+
 *,
 *::before,
 *::after {
@@ -1675,6 +1702,17 @@ h3 {
 .app-shell {
   width: min(1600px, 100%);
   padding-inline: clamp(16px, 2vw, 30px);
+}
+
+.workspace-tabs--loading {
+  pointer-events: none;
+}
+
+.workspace-tabs--loading .workspace-tab {
+  min-height: 48px;
+  background: linear-gradient(90deg, var(--surface-muted), var(--surface-raised), var(--surface-muted));
+  background-size: 200% 100%;
+  animation: skeleton 1.4s ease-in-out infinite;
 }
 
 .topbar {
@@ -1693,7 +1731,7 @@ h3 {
 
 .topbar__deskline {
   margin-bottom: 3px;
-  font-size: 10px;
+  font-size: var(--text-micro);
   font-weight: 650;
   text-transform: none;
 }
@@ -1754,7 +1792,7 @@ h1 {
 }
 
 .metric-card__topline {
-  font-size: 11px;
+  font-size: var(--text-caption);
   font-weight: 650;
   text-transform: none;
 }
@@ -1775,7 +1813,7 @@ h1 {
 
 .metric-card__tenor {
   color: var(--subtle);
-  font-size: 10px;
+  font-size: var(--text-micro);
 }
 
 .metric-card__value {
@@ -1786,7 +1824,7 @@ h1 {
 
 .metric-card__change {
   margin-top: 4px;
-  font-size: 11.5px;
+  font-size: var(--text-caption);
 }
 
 .metric-card__change-context {
@@ -1795,6 +1833,16 @@ h1 {
 
 .workspace-shell {
   margin-top: 7px;
+}
+
+.workspace-intro {
+  margin-top: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.research-header--source-only {
+  justify-content: flex-end;
+  padding-top: 0;
 }
 
 .workspace-tabs {
@@ -1911,7 +1959,21 @@ h1 {
 .research-header p,
 .futures-header p:not(.eyebrow) {
   max-width: 760px;
-  font-size: 12.5px;
+  font-size: var(--text-body);
+}
+
+.app-footer,
+.metric-card__change-unit,
+.weekly-table tbody td small,
+.comparison-regimes__header span,
+.comparison-regimes__item > span,
+.comparison-regimes__item small,
+.comparison-regimes__ref,
+.comparison-method-toggle,
+.comparison-legend__hint,
+.comparison-delta strong,
+.recharts-text {
+  font-size: 12px;
 }
 
 .research-controls,
@@ -2058,4 +2120,40 @@ h1 {
 
 .weekly-desk.panel {
   padding: 0;
+}
+
+@media (max-width: 700px) {
+  h1 {
+    font-size: 18px;
+  }
+
+  .icon-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .workspace-copy-link,
+  .segmented-control__button,
+  .spread-selector__button,
+  .research-subtab,
+  .text-button,
+  .regime-analysis-window__button,
+  .comparison-shortcuts button,
+  .comparison-legend__item,
+  .comparison-method-toggle {
+    min-height: 38px;
+  }
+
+  .chart-events-toggle,
+  .chart-event-chip {
+    min-height: 34px;
+  }
+
+  .curve-matrix__handle,
+  .regime-help {
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    justify-content: center;
+  }
 }

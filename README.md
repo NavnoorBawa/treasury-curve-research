@@ -1,6 +1,6 @@
 # U.S. Treasury Curve Research
 
-An institutional research interface for official U.S. Treasury Constant Maturity rates, long-run curve analysis, and clearly separated delayed Treasury-futures proxies. The monitor covers current 2Y, 5Y, 10Y, and 30Y CMT yields, daily changes, six core spreads, date-to-date comparison, sourced event windows, historical regimes, and selected-period statistics.
+An institutional research interface for official U.S. Treasury Constant Maturity rates and long-run curve analysis. The monitor covers current 2Y, 5Y, 10Y, and 30Y CMT yields, daily changes, six core spreads, date-to-date comparison, sourced event windows, historical regimes, selected-period statistics, and an actual-only weekly record with a separately labeled year-end statistical baseline. The repository also contains an analytically isolated delayed Treasury-futures reference implementation; it is hidden from the production navigation by default.
 
 Live deployment: <https://treasury-curve-research.vercel.app>
 
@@ -14,8 +14,8 @@ Live deployment: <https://treasury-curve-research.vercel.app>
 | Long-run history | Federal Reserve H.15 DDP package with Treasury XML latest-observation supplement |
 | Curve analytics | Six spread identities, basis-point units, missing-value rules, and CSV units independently asserted |
 | Regime analysis | Six directional classifications, neutral handling, completed-calendar-period rules, actual-only weekly records, and year-end rolling-origin controls covered by deterministic tests |
-| Futures proxies | Four-symbol allowlist, inverse price/yield interpretation, session normalization, and partial-feed handling asserted |
-| Production | Vercel deployment from `main`; `/api/health`, security headers, HTTPS, metadata, sitemap, and social preview enabled |
+| Futures proxies | Hidden-by-default four-symbol reference implementation; allowlist, inverse price/yield interpretation, session normalization, and partial-feed handling asserted |
+| Production | Vercel deployment from `main`; `/api/health`, security headers, HTTPS, metadata, sitemap, social preview, and privacy-preserving Vercel Web Analytics enabled |
 
 Run the same release gate locally with `npm run verify`.
 
@@ -26,11 +26,11 @@ The backend reads the official U.S. Treasury XML feed for Daily Treasury Par Yie
 - Source page: <https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve>
 - XML feed pattern: `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value=YYYY`
 
-No API key is required. The server fetches the current New York calendar year plus the prior year, normalizes the XML, computes daily changes against the previous Treasury observation, and caches the result for 10 minutes by default. The frontend refreshes automatically every 15 minutes while open.
+No API key is required. The server fetches the current New York calendar year plus the prior year, normalizes the XML, computes daily changes against the previous Treasury observation, and caches the result for 10 minutes by default. Cold Treasury reads use a bounded retry that remains inside the Vercel function budget; the history client fetches H.15 and the latest Treasury supplement concurrently. The frontend refreshes automatically every 15 minutes while open.
 
 Treasury CMTs are official daily par-yield observations, not transaction prices or intraday quotes. Treasury derives them from indicative bid-side quotations obtained by the Federal Reserve Bank of New York at or near 3:30 PM ET each trading day and usually publishes them by 6:00 PM ET, so no free official intraday CMT update exists. Faster polling would not make the underlying official curve fresher.
 
-The separate Futures tab uses delayed Yahoo Finance market data for CBOT 2-Year Note (`ZT=F`), 5-Year Note (`ZF=F`), 10-Year Note (`ZN=F`), and Ultra U.S. Treasury Bond (`UB=F`) futures. Ultra Bond's 25Y+ deliverable basket is used only as a 30Y-sector proxy. These are traded prices, not CMT yields. The server tries an allowlisted multi-symbol spark request, per-symbol chart requests, a five-day latest-session recovery for empty one-day responses, and finally Yahoo quote-page data. Each contract is normalized to its own CME trade date; stale or mixed-date contracts are disclosed individually, and no change is shown without a verified comparison observation. Yahoo/yfinance is an unofficial convenience layer suitable for this educational market-reference view, not an authoritative or licensed professional feed. A commercial trading deployment should replace it with licensed CME data.
+The hidden-by-default Futures workspace and `/api/futures` endpoint use delayed Yahoo Finance market data for CBOT 2-Year Note (`ZT=F`), 5-Year Note (`ZF=F`), 10-Year Note (`ZN=F`), and Ultra U.S. Treasury Bond (`UB=F`) futures. Ultra Bond's 25Y+ deliverable basket is only a 30Y-sector proxy. These are traded prices, not CMT yields. The server tries an allowlisted multi-symbol spark request, per-symbol chart requests, a five-day latest-session recovery for empty one-day responses, and finally Yahoo quote-page data. Each contract is normalized to its own CME trade date; stale or mixed-date contracts are disclosed individually, and no change is shown without a verified comparison observation. Yahoo/yfinance is an unofficial convenience layer suitable for an educational market-reference view, not an authoritative or licensed professional feed. A commercial trading deployment should replace it with licensed CME data before the workspace is exposed.
 
 FRED was reviewed as a possible primary source because it is academically familiar and reliable. The app intentionally keeps Treasury as primary for current values because Treasury is the direct official publisher of the Daily Treasury Par Yield Curve Rates, while FRED republishes the relevant DGS series from the Federal Reserve/H.15 ecosystem and its official API requires an API key.
 
@@ -46,7 +46,7 @@ This gives reliable long-run daily history back to the earliest available H.15 o
 - Long-run historical data for 2Y, 5Y, 10Y, and 30Y Treasury yields.
 - Trader-style workspace tabs: Market, Weekly, Compare, History, Events, and Regimes. Only the active view is shown, avoiding a stacked-scroll layout. The delayed Futures implementation remains analytically isolated and can be re-enabled separately.
 - A local Weekly view with Monday-Friday official observations only, explicit blank holiday/unpublished rows, selected-pair daily regimes, actual latest-week and year-to-date diagnoses, and a separately labeled year-end Dynamic Nelson-Siegel/random-walk baseline. The year-end section reports rolling-origin benchmark errors, model weights, and empirical predictive bands. No forecast enters official datasets or exports. See [docs/weekly-outlook.md](./docs/weekly-outlook.md).
-- A delayed CBOT Treasury-futures tape for `ZT=F`, `ZF=F`, `ZN=F`, and `UB=F`, with per-contract trade date and freshness, verified session range, conditional prior-session comparisons in 32nds, quote timestamps, and explicit inverse price/yield direction. Incoherent provider snapshots are disclosed rather than presented as one live market state. Futures data is isolated from every official CMT calculation, spread, regime, statistic, and export.
+- An optional delayed CBOT Treasury-futures implementation for `ZT=F`, `ZF=F`, `ZN=F`, and `UB=F`, hidden from current production navigation. It retains per-contract trade date and freshness, verified session range, conditional prior-session comparisons in 32nds, quote timestamps, and explicit inverse price/yield direction. Futures data remains isolated from every official CMT calculation, spread, regime, statistic, forecast, and export.
 - Validated shareable workspace URLs preserve the active view and relevant range, dates, spread, curve pair, history section, and weekly/monthly interval. The Copy view action writes the normalized setup URL to the clipboard; malformed or out-of-sample parameters fall back to valid H.15 dates and supported controls.
 - Date-range presets: 1Y, 5Y, 10Y, 20Y, Max, plus custom start/end dates.
 - Six core 2Y/5Y/10Y/30Y curve combinations: 5Y-2Y, 10Y-2Y, 30Y-2Y, 10Y-5Y, 30Y-5Y, and 30Y-10Y.
@@ -55,7 +55,8 @@ This gives reliable long-run daily history back to the earliest available H.15 o
 - A weekly or monthly color-coded curve-regime ribbon for each of the six segments. Classifications are ex-post descriptions of non-overlapping completed calendar intervals, not contemporaneous signals. The six directional classifications are bull steepening, bear steepening, bull flattening, bear flattening, parallel shift higher, and parallel shift lower. Near-parallel uses a disclosed project-defined 3 bps weekly or 5 bps monthly slope tolerance. Exact-zero pair-average moves are neutral and excluded from the six directional counts; open periods remain unclassified.
 - Selected-range CSV export containing dates, 2Y/5Y/10Y/30Y yields in percent per annum, and all six core curve spreads in basis points; every exported column declares its unit.
 - Selected-period statistics: last valid observation and date, min, max, average, annualized daily-change volatility, 1M/3M/1Y changes, last-value empirical CDF, and valid observation count. Lookback changes use the nearest valid observation on or before the calendar target even when it predates the visible range.
-- Light and dark themes for presentation use.
+- Extrema-preserving chart sampling above 420 displayed observations. Statistics, lookback changes, regime calculations, event placement, and CSV exports continue to use every source observation.
+- Light-default and dark themes, with the user's choice retained on the device.
 
 Historical charts use observed business-day data only. Weekends, market holidays, and source-level `ND` observations are not imputed. Treasury ceased publication of the 30Y CMT on February 18, 2002 and resumed it on February 9, 2006; the dashboard explicitly preserves February 18, 2002 through February 8, 2006 as unavailable rather than treating H.15's interim estimated values as observed 30Y quotations. Dependent 30Y spreads are consequently unavailable for that interval. A methodology marker identifies Treasury's December 6, 2021 shift from quasi-cubic Hermite to monotone-convex curve construction; both regimes remain official, but long-run comparisons should recognize the change.
 
@@ -82,6 +83,8 @@ Open <http://localhost:4174>. In production, Express serves both `/api/yields` a
 ## Scripts
 
 - `npm run dev`: start Vite and Express together.
+- `npm run lint`: run ESLint with zero warnings allowed.
+- `npm run typecheck`: run the TypeScript compiler without producing files.
 - `npm run build`: type-check and create the production frontend bundle.
 - `npm start`: run the production Express server.
 - `npm run preview`: preview only the Vite build.
@@ -89,7 +92,7 @@ Open <http://localhost:4174>. In production, Express serves both `/api/yields` a
 - `npm run verify:futures`: verify the four-symbol allowlist, price-change calculations, inverse yield-direction semantics, range validation, and partial-feed behavior with deterministic fixtures.
 - `npm run verify:futures:live`: additionally fetch the current delayed Yahoo futures data and validate all four contracts and their intraday bars.
 - `npm run verify:research`: verify all six curve classifications, completed-period handling, selected-window statistics, and unit-explicit CSV output.
-- `npm run verify`: run the production build plus research and official-data verification suites.
+- `npm run verify`: run lint, the production TypeScript/Vite build, deterministic research and futures checks, and live official Treasury/H.15 reconciliation.
 
 ## Configuration
 
@@ -202,6 +205,8 @@ The production deployment includes:
 
 Security headers are configured in `vercel.json` for Vercel and through Helmet for the local Express production server. The app has no required secrets or API keys.
 
+Vercel Web Analytics is enabled for aggregate launch monitoring. The React integration is cookieless and does not add an application-level user identifier; analytics requests remain subject to Vercel's service and privacy terms. No financial input, portfolio data, or user account data is collected by this application.
+
 The Vercel project is connected to the GitHub `main` branch. A push to `main` creates a production deployment; other branches can be used for preview deployments. A manual production deployment is also available:
 
 ```bash
@@ -241,7 +246,7 @@ For static-only hosts, keep the backend deployed separately and point the fronte
 npm ci
 npm run verify
 npm run verify:futures:live
-npm audit --omit=dev
+npm audit --audit-level=high
 ```
 
 Before publishing, confirm that the production health endpoint returns `200`, the latest official Treasury record date is current for the publication calendar, and the social preview uses `og-rates-monitor.png`.

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -127,12 +127,6 @@ export function TreasuryFuturesWorkspace() {
   const { data, error, isFetching, isLoading, refetch } = useTreasuryFutures("1D");
   const selected = data?.instruments.find((instrument) => instrument.symbol === selectedSymbol)
     ?? data?.instruments[0];
-
-  useEffect(() => {
-    if (data?.instruments.length && !data.instruments.some((instrument) => instrument.symbol === selectedSymbol)) {
-      setSelectedSymbol(data.instruments[0].symbol);
-    }
-  }, [data?.instruments, selectedSymbol]);
 
   const chartDomain = useMemo<[number, number]>(() => {
     if (!selected?.series.length) return [0, 1];

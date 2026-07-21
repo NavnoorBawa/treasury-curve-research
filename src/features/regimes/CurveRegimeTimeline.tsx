@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import {
   CartesianGrid,
   Line,
@@ -27,6 +27,7 @@ import {
   type CurveRegimePoint,
   type MacroEvent
 } from "@/domain/treasury/research";
+import { sampleTimeSeriesByExtrema } from "@/domain/treasury/chartSampling";
 import type { HistoricalRow } from "@/domain/treasury/types";
 import { formatBps, formatDate } from "@/utils/format";
 
@@ -308,16 +309,27 @@ export function CurveRegimeTimeline({ rows, pair, startDate, endDate, horizon, e
   );
   const episodes = useMemo(() => buildEpisodes(timeline), [timeline]);
   const spreadSeries = useMemo<SpreadChartPoint[]>(
-    () => rawSpreadSeries.map((point) => {
-      const matchingEpisode = episodes.find((episode) => point.date >= episode.startDate && point.date <= episode.endDate);
-      const regimeType = matchingEpisode?.type ?? null;
+    () => {
+      let episodeIndex = 0;
 
-      return {
-        ...point,
-        regimeType,
-        ...(regimeType && regimeType !== "Neutral / unclassified" ? { [regimeSeriesKey(regimeType)]: point.spreadBps } : {})
-      };
-    }),
+      return rawSpreadSeries.map((point) => {
+        while (episodeIndex < episodes.length && point.date > episodes[episodeIndex].endDate) {
+          episodeIndex += 1;
+        }
+
+        const candidate = episodes[episodeIndex];
+        const matchingEpisode = candidate && point.date >= candidate.startDate && point.date <= candidate.endDate
+          ? candidate
+          : null;
+        const regimeType = matchingEpisode?.type ?? null;
+
+        return {
+          ...point,
+          regimeType,
+          ...(regimeType && regimeType !== "Neutral / unclassified" ? { [regimeSeriesKey(regimeType)]: point.spreadBps } : {})
+        };
+      });
+    },
     [episodes, rawSpreadSeries]
   );
   const [asOfDate, setAsOfDate] = useState(endDate);
@@ -325,14 +337,6 @@ export function CurveRegimeTimeline({ rows, pair, startDate, endDate, horizon, e
   const [customReferenceDate, setCustomReferenceDate] = useState(startDate);
   const [selectedEpisodeId, setSelectedEpisodeId] = useState<string | null>(null);
   const [pinnedRegime, setPinnedRegime] = useState<CurveMoveType | null>(null);
-
-  useEffect(() => {
-    setSlopeToleranceBps(curveMoveShapeToleranceBps[horizon]);
-    setAsOfDate((current) => !current || current < startDate || current > endDate ? endDate : current);
-    setCustomReferenceDate((current) => !current || current < startDate || current >= endDate ? startDate : current);
-    setSelectedEpisodeId(null);
-    setPinnedRegime(null);
-  }, [endDate, horizon, pair.key, startDate]);
 
   const analysisReferenceTarget = useMemo(() => {
     if (analysisWindow === "RANGE") return startDate;
@@ -368,13 +372,33 @@ export function CurveRegimeTimeline({ rows, pair, startDate, endDate, horizon, e
     [analysisAsOf, analysisMove]
   );
   const chartSeries = useMemo<SpreadChartPoint[]>(
-    () => spreadSeries.map((point) => ({
-      ...point,
-      selectedSpreadBps: selectedWindow && point.date >= selectedWindow.startDate && point.date <= selectedWindow.endDate
-        ? point.spreadBps
-        : null
-    })),
-    [selectedWindow, spreadSeries]
+    () => {
+      const fullSeries = spreadSeries.map((point) => ({
+        ...point,
+        selectedSpreadBps: selectedWindow && point.date >= selectedWindow.startDate && point.date <= selectedWindow.endDate
+          ? point.spreadBps
+          : null
+      }));
+      const sampledSeries = sampleTimeSeriesByExtrema(fullSeries, ["spreadBps", "selectedSpreadBps"], 640);
+      const requiredDates = new Set<string>(eventMarkers.map((marker) => marker.markerDate));
+
+      episodes.forEach((episode) => {
+        requiredDates.add(episode.startDate);
+        requiredDates.add(episode.endDate);
+      });
+      if (selectedWindow) {
+        requiredDates.add(selectedWindow.startDate);
+        requiredDates.add(selectedWindow.endDate);
+      }
+
+      const chartPoints = new Map(sampledSeries.map((point) => [point.date, point]));
+      fullSeries.forEach((point) => {
+        if (requiredDates.has(point.date)) chartPoints.set(point.date, point);
+      });
+
+      return [...chartPoints.values()].sort((left, right) => left.date.localeCompare(right.date));
+    },
+    [episodes, eventMarkers, selectedWindow, spreadSeries]
   );
   const highlightedRegime = pinnedRegime;
 
@@ -554,7 +578,6 @@ export function CurveRegimeTimeline({ rows, pair, startDate, endDate, horizon, e
                     key={move.type}
                     style={regimeStyle(move.type)}
                     data-regime={regimeDomKey[move.type]}
-                    aria-label={`${move.type}: ${counts[move.type]} completed ${noun} classifications. ${isPinned ? "Remove filter" : "Isolate regime"}.`}
                     aria-pressed={isPinned}
                     title={`${move.type} · click to isolate`}
                     onPointerEnter={(event) => setRegimePreview(event.currentTarget, move.type)}
@@ -699,31 +722,47 @@ export function CurveRegimeTimeline({ rows, pair, startDate, endDate, horizon, e
           <span>Completed {noun} regimes <HelpTip label={`Each colored block is a completed ${noun} move. Select a block to load its exact dates as a custom comparison.`} /></span>
           <span>{timeline.length ? intervalLabel(timeline[0].comparisonDate, timeline.at(-1)?.date ?? endDate) : "No completed intervals in view"}</span>
         </div>
-        <div className="regime-ribbon" aria-label={`${horizon} curve-regime intervals`}>
+        <div className="regime-ribbon" aria-hidden="true">
           {episodes.length ? episodes.map((episode) => {
-            const move = aggregateEpisodeMove(episode);
             const isSelected = episode.id === selectedEpisode?.id;
             const isHighlighted = highlightedRegime === episode.type;
             const isMuted = highlightedRegime !== null && !isHighlighted;
-            const pluralizedPeriods = episode.points.length === 1 ? `${noun}` : `${noun}s`;
-            const label = `${episode.type}, ${episode.points.length} consecutive ${pluralizedPeriods}, ${intervalLabel(episode.startDate, episode.endDate)}, slope ${formatBps(move.spreadDeltaBps)}`;
 
             return (
-              <button
+              <span
                 key={episode.id}
-                type="button"
                 className={`regime-ribbon__segment${isSelected ? " regime-ribbon__segment--active" : ""}${isHighlighted ? " regime-ribbon__segment--highlighted" : ""}${isMuted ? " regime-ribbon__segment--muted" : ""}`}
                 style={{ ...regimeStyle(episode.type), flexGrow: episode.durationDays } as CSSProperties}
                 data-shape={regimeShape(episode.type)}
                 data-regime={regimeDomKey[episode.type]}
-                onClick={() => handleEpisodeSelect(episode)}
-                aria-label={label}
-                aria-pressed={isSelected}
-                title={label}
               />
             );
           }) : <span className="regime-ribbon__empty">No completed calendar {noun}s</span>}
         </div>
+        {episodes.length ? (
+          <label className="regime-ribbon__selector" htmlFor="regime-period-selector">
+            <span>Inspect completed {noun}</span>
+            <select
+              id="regime-period-selector"
+              value={selectedEpisodeId ?? ""}
+              onChange={(event) => {
+                const episode = episodes.find((item) => item.id === event.target.value);
+                if (episode) handleEpisodeSelect(episode);
+                else setSelectedEpisodeId(null);
+              }}
+            >
+              <option value="">Date-to-date selection</option>
+              {episodes.map((episode) => {
+                const move = aggregateEpisodeMove(episode);
+                return (
+                  <option key={episode.id} value={episode.id}>
+                    {episode.type} · {intervalLabel(episode.startDate, episode.endDate)} · slope {formatBps(move.spreadDeltaBps)}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+        ) : null}
       </div>
 
       {analysisMove ? (
@@ -748,7 +787,7 @@ export function CurveRegimeTimeline({ rows, pair, startDate, endDate, horizon, e
       <div className="spread-note">
         <Info size={15} aria-hidden="true" />
         <span>
-          Colors are ex-post classifications of completed calendar periods, not contemporaneous trading signals. The chart highlight is the selected date-to-date comparison; the ribbon is completed-period history. Pair average move is the average of the selected-tenor yield changes; pair slope change is the change in the long-minus-short spread. A positive pair average is bear/higher, a negative average is bull/lower, and an exactly zero average is neutral and excluded from the six directional counts. Near-parallel applies only when the pair&apos;s slope change is within the stated project-defined tolerance, not to the full Treasury curve.
+          Colors are ex-post classifications of completed calendar periods, not contemporaneous trading signals. The chart highlight is the selected date-to-date comparison; the ribbon is completed-period history. Pair average move is the average of the selected-tenor yield changes; pair slope change is the change in the long-minus-short spread. A positive pair average is bear/higher, a negative average is bull/lower, and an exactly zero average is neutral and excluded from the six directional counts. Near-parallel applies only when the pair&apos;s slope change is within the stated project-defined tolerance, not to the full Treasury curve. Long chart windows use extrema-preserving display sampling; classifications, counts, and selected-period calculations use every source observation.
         </span>
       </div>
     </article>

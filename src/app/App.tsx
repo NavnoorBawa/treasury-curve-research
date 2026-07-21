@@ -1,16 +1,67 @@
+import { lazy, Suspense, useState } from "react";
 import { Landmark, RefreshCw, Moon, Sun } from "lucide-react";
 import { LoadingBlock } from "@/components/ui/LoadingBlock";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { useTreasuryYields } from "@/features/market/useTreasuryYields";
-import { ResearchWorkbench } from "@/features/research/ResearchWorkbench";
 import { useTheme } from "@/hooks/useTheme";
 import "@/styles/global.css";
 import "@/styles/trader-workspace.css";
 import { formatDate } from "@/utils/format";
 
+type ResearchView = "market" | "weekly" | "compare" | "history" | "events" | "regimes";
+
+const researchViewMeta: Record<Exclude<ResearchView, "market">, { title: string; description: string }> = {
+  weekly: {
+    title: "Weekly Curve Monitor",
+    description: "Official Monday-Friday CMT records with an independently validated, clearly separated year-end statistical baseline."
+  },
+  compare: {
+    title: "Historical Yield Curve Comparison",
+    description: "Compare complete Treasury curves from up to three official business-day observations."
+  },
+  history: {
+    title: "Historical Treasury Regime Analysis",
+    description: "Analyze rates, spreads, and statistical behavior without leaving the workspace."
+  },
+  events: {
+    title: "Macro Event Windows",
+    description: "Sourced macro and methodology markers inside the selected range. Focus any event to open it in the rates charts."
+  },
+  regimes: {
+    title: "Curve Movement Regimes",
+    description: "Date-to-date two-tenor decomposition with ex-post classifications of completed calendar periods."
+  }
+};
+
+const readInitialResearchView = (): ResearchView => {
+  const view = new URLSearchParams(window.location.search).get("view")?.toLowerCase();
+  if (view === "weekly" || view === "compare" || view === "history" || view === "events" || view === "regimes") return view;
+  return "market";
+};
+
+const ResearchWorkbench = lazy(async () => {
+  const module = await import("@/features/research/ResearchWorkbench");
+  return { default: module.ResearchWorkbench };
+});
+
+function ResearchWorkbenchFallback() {
+  return (
+    <section className="workspace-shell workspace-shell--loading" aria-label="Treasury research workspace" aria-busy="true">
+      <div className="workspace-tabs workspace-tabs--loading" aria-hidden="true">
+        {Array.from({ length: 6 }).map((_, index) => <span key={index} className="workspace-tab" />)}
+      </div>
+      <div className="workspace-panel">
+        <LoadingBlock className="panel" rows={6} />
+      </div>
+    </section>
+  );
+}
+
 function App() {
   const { theme, toggleTheme } = useTheme();
   const { data, error, isFetching, isLoading, refetch } = useTreasuryYields();
+  const [researchView, setResearchView] = useState<ResearchView>(readInitialResearchView);
+  const activeResearchMeta = researchView === "market" ? null : researchViewMeta[researchView];
 
   return (
     <main className="app-shell">
@@ -36,7 +87,7 @@ function App() {
             <span className="refresh-pill__dot" />
             <span className="refresh-pill__copy">
               <small>Official CMT</small>
-              <strong>{data ? formatDate(data.source.recordDate) : "Connecting"}</strong>
+              <strong>{data ? formatDate(data.source.recordDate) : isLoading || isFetching ? "Connecting" : "Unavailable"}</strong>
             </span>
           </div>
           <button className="icon-button" type="button" onClick={() => refetch()} aria-label="Refresh data" title="Refresh official data">
@@ -77,7 +128,24 @@ function App() {
             : <div className="metric-grid__empty">Official CMT snapshot unavailable</div>}
       </section>
 
-      <ResearchWorkbench currentData={data} currentLoading={isLoading || isFetching} currentError={error} />
+      {activeResearchMeta ? (
+        <section className="research-header research-header--workspace workspace-intro" aria-live="polite">
+          <div>
+            <p className="eyebrow">Macro research layer</p>
+            <h2>{activeResearchMeta.title}</h2>
+            <p>{activeResearchMeta.description}</p>
+          </div>
+        </section>
+      ) : null}
+
+      <Suspense fallback={<ResearchWorkbenchFallback />}>
+        <ResearchWorkbench
+          currentData={data}
+          currentLoading={isLoading || isFetching}
+          currentError={error}
+          onActiveViewChange={(view) => setResearchView(view === "comparison" ? "compare" : view === "snapshot" || view === "futures" ? "market" : view)}
+        />
+      </Suspense>
 
       <footer className="app-footer">
         <span>Official daily: U.S. Treasury XML. History: Federal Reserve H.15. Futures reference: delayed Yahoo Finance/CBOT.</span>

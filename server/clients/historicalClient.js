@@ -120,28 +120,9 @@ const treasuryLatestToResearchRow = (treasuryData) => {
   return buildSpreadValues(row);
 };
 
-const mergeTreasuryLatest = async (rows) => {
-  try {
-    const treasuryData = await getTreasuryYieldData();
-    const latestTreasuryRow = treasuryLatestToResearchRow(treasuryData);
-    const existingIndex = rows.findIndex((row) => row.date === latestTreasuryRow.date);
-
-    if (existingIndex >= 0) {
-      rows[existingIndex] = { ...rows[existingIndex], ...latestTreasuryRow };
-      return { rows, supplementalSource: "Treasury XML replaced matching latest date.", supplementalContentSha256: treasuryData.source.contentSha256 };
-    }
-
-    const latestFedDate = rows.at(-1)?.date;
-    if (latestFedDate && latestTreasuryRow.date > latestFedDate) {
-      return {
-        rows: [...rows, latestTreasuryRow].sort((a, b) => a.date.localeCompare(b.date)),
-        supplementalSource: "Treasury XML appended fresher latest official observation.",
-        supplementalContentSha256: treasuryData.source.contentSha256
-      };
-    }
-
-    return { rows, supplementalSource: "Federal Reserve H.15 contains the latest research observation.", supplementalContentSha256: treasuryData.source.contentSha256 };
-  } catch (error) {
+const mergeTreasuryLatest = (rows, treasuryResult) => {
+  if (treasuryResult.status === "rejected") {
+    const error = treasuryResult.reason;
     return {
       rows,
       supplementalSource:
@@ -151,6 +132,26 @@ const mergeTreasuryLatest = async (rows) => {
       supplementalContentSha256: null
     };
   }
+
+  const treasuryData = treasuryResult.value;
+  const latestTreasuryRow = treasuryLatestToResearchRow(treasuryData);
+  const existingIndex = rows.findIndex((row) => row.date === latestTreasuryRow.date);
+
+  if (existingIndex >= 0) {
+    rows[existingIndex] = { ...rows[existingIndex], ...latestTreasuryRow };
+    return { rows, supplementalSource: "Treasury XML replaced matching latest date.", supplementalContentSha256: treasuryData.source.contentSha256 };
+  }
+
+  const latestFedDate = rows.at(-1)?.date;
+  if (latestFedDate && latestTreasuryRow.date > latestFedDate) {
+    return {
+      rows: [...rows, latestTreasuryRow].sort((a, b) => a.date.localeCompare(b.date)),
+      supplementalSource: "Treasury XML appended fresher latest official observation.",
+      supplementalContentSha256: treasuryData.source.contentSha256
+    };
+  }
+
+  return { rows, supplementalSource: "Federal Reserve H.15 contains the latest research observation.", supplementalContentSha256: treasuryData.source.contentSha256 };
 };
 
 const buildAvailability = (rows) =>
@@ -169,10 +170,16 @@ const buildAvailability = (rows) =>
   );
 
 export async function getHistoricalYieldData() {
-  const csv = await fetchWithTimeout(FED_H15_TREASURY_CMT_URL);
+  const [h15Result, treasuryResult] = await Promise.allSettled([
+    fetchWithTimeout(FED_H15_TREASURY_CMT_URL),
+    getTreasuryYieldData()
+  ]);
+  if (h15Result.status === "rejected") throw h15Result.reason;
+
+  const csv = h15Result.value;
   const h15ContentSha256 = sha256(csv);
   const parsedRows = parseFedCsv(csv);
-  const { rows, supplementalSource, supplementalContentSha256 } = await mergeTreasuryLatest(parsedRows);
+  const { rows, supplementalSource, supplementalContentSha256 } = mergeTreasuryLatest(parsedRows, treasuryResult);
 
   return {
     source: {
@@ -188,7 +195,12 @@ export async function getHistoricalYieldData() {
       note:
         "The observed 30Y CMT is intentionally unavailable from February 18, 2002 through February 8, 2006, the Treasury discontinuation/reintroduction interval; dependent 30Y spreads are null for the same period."
     },
-    maturities: HISTORICAL_MATURITIES.map(({ field, ...maturity }) => maturity),
+    maturities: HISTORICAL_MATURITIES.map(({ key, label, shortLabel, years }) => ({
+      key,
+      label,
+      shortLabel,
+      years
+    })),
     spreads: RESEARCH_SPREADS,
     availability: buildAvailability(rows),
     rows

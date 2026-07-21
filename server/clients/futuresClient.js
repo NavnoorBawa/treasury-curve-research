@@ -264,7 +264,7 @@ const fetchSparkPayload = async (rangeKey) => {
     }
   }
 
-  let quotePageError = null;
+  let quotePageError;
   try {
     const payload = await fetchQuotePageFallback();
     return {

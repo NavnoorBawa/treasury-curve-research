@@ -56,6 +56,7 @@ import {
   type RangePreset
 } from "@/domain/treasury/research";
 import type { ResearchMaturityKey, SpreadKey, TreasuryPayload } from "@/domain/treasury/types";
+import { sampleTimeSeriesByExtrema } from "@/domain/treasury/chartSampling";
 
 type WorkspaceTab = "snapshot" | "weekly" | "futures" | "comparison" | "history" | "events" | "regimes";
 type HistoryView = "charts" | "statistics";
@@ -264,14 +265,16 @@ interface ResearchWorkbenchProps {
   currentData?: TreasuryPayload;
   currentLoading: boolean;
   currentError: Error | null;
+  onActiveViewChange?: (view: WorkspaceTab) => void;
 }
 
-export function ResearchWorkbench({ currentData, currentLoading, currentError }: ResearchWorkbenchProps) {
+export function ResearchWorkbench({ currentData, currentLoading, currentError, onActiveViewChange }: ResearchWorkbenchProps) {
   const [initialWorkspaceState] = useState(readWorkspaceState);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(initialWorkspaceState.activeTab);
   const [historyView, setHistoryView] = useState<HistoryView>(initialWorkspaceState.historyView);
   const shouldLoadHistory = activeTab === "weekly" || activeTab === "comparison" || activeTab === "history" || activeTab === "events" || activeTab === "regimes";
   const { data, error, isLoading } = useHistoricalYields(shouldLoadHistory);
+  const historicalRows = data?.rows;
   const [preset, setPreset] = useState<RangePreset>(initialWorkspaceState.preset);
   const [range, setRange] = useState(initialWorkspaceState.range);
   const [selectedSpread, setSelectedSpread] = useState<SpreadKey>(initialWorkspaceState.selectedSpread);
@@ -287,9 +290,13 @@ export function ResearchWorkbench({ currentData, currentLoading, currentError }:
   const highlightedEventId = hoveredEventId ?? pinnedEventId;
 
   useEffect(() => {
-    if (!data?.rows.length) return;
-    const firstDate = data.rows[0]?.date ?? "";
-    const latestDate = data.rows.at(-1)?.date ?? "";
+    onActiveViewChange?.(activeTab);
+  }, [activeTab, onActiveViewChange]);
+
+  useEffect(() => {
+    if (!historicalRows?.length) return;
+    const firstDate = historicalRows[0]?.date ?? "";
+    const latestDate = historicalRows.at(-1)?.date ?? "";
     const normalizedAsOf = comparisonAsOf >= firstDate && comparisonAsOf <= latestDate ? comparisonAsOf : latestDate;
     const defaultReference = normalizedAsOf ? getComparisonTargetDate(normalizedAsOf, "1Y") : firstDate;
     const normalizedReference = comparisonReference >= firstDate && comparisonReference < normalizedAsOf
@@ -304,19 +311,19 @@ export function ResearchWorkbench({ currentData, currentLoading, currentError }:
       const normalizedEnd = range.end > latestDate ? latestDate : range.end;
       if (normalizedStart > normalizedEnd) {
         setPreset("10Y");
-        setRange(getPresetRange("10Y", data.rows));
+        setRange(getPresetRange("10Y", historicalRows));
       } else if (normalizedStart !== range.start || normalizedEnd !== range.end) {
         setRange({ start: normalizedStart, end: normalizedEnd });
       }
     } else if (!range.start || !range.end) {
       const initialPreset = preset === "CUSTOM" ? "10Y" : preset;
-      setRange(getPresetRange(initialPreset, data.rows));
+      setRange(getPresetRange(initialPreset, historicalRows));
       if (preset === "CUSTOM") setPreset("10Y");
     }
     if (comparisonAsOf !== normalizedAsOf) setComparisonAsOf(normalizedAsOf);
     if (comparisonReference !== normalizedReference) setComparisonReference(normalizedReference);
     if (comparisonReference2 !== normalizedReference2) setComparisonReference2(normalizedReference2);
-  }, [comparisonAsOf, comparisonReference, comparisonReference2, data?.rows, preset, range.end, range.start]);
+  }, [comparisonAsOf, comparisonReference, comparisonReference2, historicalRows, preset, range.end, range.start]);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -365,9 +372,9 @@ export function ResearchWorkbench({ currentData, currentLoading, currentError }:
   }, [copyStatus]);
 
   const selectedRows = useMemo(() => {
-    if (!data?.rows.length || !range.start || !range.end) return [];
-    return filterRowsByRange(data.rows, range.start, range.end);
-  }, [data?.rows, range.end, range.start]);
+    if (!historicalRows?.length || !range.start || !range.end) return [];
+    return filterRowsByRange(historicalRows, range.start, range.end);
+  }, [historicalRows, range.end, range.start]);
 
   const visibleEvents = useMemo(() => {
     if (!range.start || !range.end) return [];
@@ -383,10 +390,18 @@ export function ResearchWorkbench({ currentData, currentLoading, currentError }:
   );
 
   const statsReferenceRows = useMemo(() => {
-    if (!data?.rows.length || !range.end) return selectedRows;
-    return data.rows.filter((row) => row.date <= range.end);
-  }, [data?.rows, range.end, selectedRows]);
+    if (!historicalRows?.length || !range.end) return selectedRows;
+    return historicalRows.filter((row) => row.date <= range.end);
+  }, [historicalRows, range.end, selectedRows]);
   const stats = useMemo(() => buildStats(selectedRows, statsReferenceRows), [selectedRows, statsReferenceRows]);
+  const yieldChartRows = useMemo(
+    () => sampleTimeSeriesByExtrema(selectedRows, maturityKeys, 420),
+    [selectedRows]
+  );
+  const spreadChartRows = useMemo(
+    () => sampleTimeSeriesByExtrema(selectedRows, [selectedSpread], 420),
+    [selectedRows, selectedSpread]
+  );
 
   const selectedSpreadMeta = data?.spreads.find((spread) => spread.key === selectedSpread);
   const selectedPair = curvePairs.find((pair) => pair.key === selectedPairKey) ?? curvePairs[1];
@@ -601,7 +616,7 @@ export function ResearchWorkbench({ currentData, currentLoading, currentError }:
           </div>
           <div className="research-chart">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={selectedRows} margin={{ top: 12, right: 18, bottom: 6, left: -6 }}>
+              <LineChart data={yieldChartRows} margin={{ top: 12, right: 18, bottom: 6, left: -6 }}>
                 <CartesianGrid vertical={false} stroke="var(--chart-grid)" strokeDasharray="3 6" />
                 <XAxis dataKey="date" minTickGap={42} tickFormatter={compactDateTick} tickLine={false} axisLine={false} tick={{ fill: "var(--muted)", fontSize: 12 }} />
                 <YAxis tickLine={false} axisLine={false} width={50} domain={["dataMin - 0.35", "dataMax + 0.35"]} tickFormatter={(value) => `${Number(value).toFixed(1)}%`} tick={{ fill: "var(--muted)", fontSize: 12 }} />
@@ -633,7 +648,7 @@ export function ResearchWorkbench({ currentData, currentLoading, currentError }:
           </div>
           <div className="spread-chart">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={selectedRows} margin={{ top: 10, right: 14, bottom: 4, left: -10 }}>
+              <AreaChart data={spreadChartRows} margin={{ top: 10, right: 14, bottom: 4, left: -10 }}>
                 <defs>
                   <linearGradient id="spread-gradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={spreadColors[selectedSpread]} stopOpacity={0.22} />
@@ -717,8 +732,36 @@ export function ResearchWorkbench({ currentData, currentLoading, currentError }:
         <span>Last obs. is the latest valid maturity value inside the selected window. Last-value ECDF is the share of valid selected observations at or below that value; Obs. is the valid sample count.</span>
         <span>Min, max, average, volatility, and ECDF use the selected range. 1M, 3M, and 1Y changes use the nearest valid observation on or before each calendar lookback, including an observation just before the visible range; a value is shown only when that observation is within 10 calendar days of the target date.</span>
         <span>Annualized volatility is the sample standard deviation of business-day yield changes multiplied by the square root of 252.</span>
+        <span>When a chart window exceeds 420 observations, its display path uses extrema-preserving sampling for rendering performance. Statistics, lookback changes, regime calculations, and CSV exports continue to use every source observation.</span>
       </div>
     </article>
+  );
+
+  const renderResearchHeader = () => (
+    <div className="research-header research-header--workspace research-header--source-only">
+      <div className="research-source" aria-live="polite">
+        <span>
+          {data
+            ? data.rows.length > 0 && data.source.recordStartDate && data.source.recordEndDate
+              ? `History: ${formatDate(data.source.recordStartDate)} - ${formatDate(data.source.recordEndDate)}`
+              : "History: no official observations"
+            : error
+              ? "History: official H.15 unavailable"
+              : "History: loading official H.15 records"}
+        </span>
+        <strong>{data ? `${data.rows.length.toLocaleString()} daily records` : error ? "No records loaded" : "Preparing daily records"}</strong>
+        <button
+          type="button"
+          className={`workspace-copy-link${copyStatus === "copied" ? " workspace-copy-link--copied" : ""}${copyStatus === "error" ? " workspace-copy-link--error" : ""}`}
+          onClick={copyCurrentView}
+          aria-live="polite"
+          title="Copy a link to this workspace setup"
+        >
+          {copyStatus === "copied" ? <Check size={14} aria-hidden="true" /> : <Link2 size={14} aria-hidden="true" />}
+          <span>{copyStatus === "copied" ? "Copied" : copyStatus === "error" ? "Copy failed" : "Copy view"}</span>
+        </button>
+      </div>
+    </div>
   );
 
   return (
@@ -765,32 +808,13 @@ export function ResearchWorkbench({ currentData, currentLoading, currentError }:
         <TreasuryFuturesWorkspace />
       ) : isLoading || !data ? (
         <div className="workspace-panel" role="tabpanel" id={`workspace-panel-${activeTab}`} aria-labelledby={`workspace-tab-${activeTab}`} tabIndex={0}>
+          {renderResearchHeader()}
           {error ? <div className="notice" role="alert"><strong>Unable to load long-run historical data.</strong><span>{error instanceof Error ? error.message : "Please retry in a moment."}</span></div> : <LoadingBlock className="panel" rows={7} />}
         </div>
       ) : (
         <div className="workspace-panel" role="tabpanel" id={`workspace-panel-${activeTab}`} aria-labelledby={`workspace-tab-${activeTab}`} tabIndex={0}>
           {data.cache.warning || error ? <div className="notice notice--warning" role="status"><strong>Historical refresh warning.</strong><span>{data.cache.warning ?? `Displaying the last loaded H.15 dataset. ${error instanceof Error ? error.message : ""}`}</span></div> : null}
-          <div className="research-header research-header--workspace">
-            <div>
-              <p className="eyebrow">Macro research layer</p>
-              <h2>{activeTab === "weekly" ? "Weekly Curve Monitor" : activeTab === "comparison" ? "Historical Yield Curve Comparison" : activeTab === "regimes" ? "Curve Movement Regimes" : activeTab === "events" ? "Macro Event Windows" : "Historical Treasury Regime Analysis"}</h2>
-              <p>{activeTab === "weekly" ? "Official Monday–Friday CMT records with an independently validated, clearly separated year-end statistical baseline." : activeTab === "comparison" ? "Compare complete Treasury curves from up to three official business-day observations." : activeTab === "regimes" ? "Date-to-date two-tenor decomposition with ex-post classifications of completed calendar periods." : activeTab === "events" ? "Sourced macro and methodology markers inside the selected range. Focus any event to open it in the rates charts." : "Analyze rates, spreads, and statistical behavior without leaving the workspace."}</p>
-            </div>
-            <div className="research-source">
-              <span>History: {formatDate(data.source.recordStartDate)} - {formatDate(data.source.recordEndDate)}</span>
-              <strong>{data.rows.length.toLocaleString()} daily records</strong>
-              <button
-                type="button"
-                className={`workspace-copy-link${copyStatus === "copied" ? " workspace-copy-link--copied" : ""}${copyStatus === "error" ? " workspace-copy-link--error" : ""}`}
-                onClick={copyCurrentView}
-                aria-live="polite"
-                title="Copy a link to this workspace setup"
-              >
-                {copyStatus === "copied" ? <Check size={14} aria-hidden="true" /> : <Link2 size={14} aria-hidden="true" />}
-                <span>{copyStatus === "copied" ? "Copied" : copyStatus === "error" ? "Copy failed" : "Copy view"}</span>
-              </button>
-            </div>
-          </div>
+          {renderResearchHeader()}
 
           {activeTab === "comparison" ? (
             <>
@@ -854,7 +878,7 @@ export function ResearchWorkbench({ currentData, currentLoading, currentError }:
                 </div>
               </div>
               {renderEventMarkerControls()}
-              {range.start && range.end ? <CurveRegimeTimeline rows={data.rows} pair={selectedPair} startDate={range.start} endDate={range.end} horizon={regimeHorizon} eventMarkers={showEventMarkers ? chartEventMarkers : []} highlightedEventId={highlightedEventId} /> : <div className="empty-state">Select a date range to map curve movement.</div>}
+              {range.start && range.end ? <CurveRegimeTimeline key={`${selectedPair.key}-${regimeHorizon}-${range.start}-${range.end}`} rows={data.rows} pair={selectedPair} startDate={range.start} endDate={range.end} horizon={regimeHorizon} eventMarkers={showEventMarkers ? chartEventMarkers : []} highlightedEventId={highlightedEventId} /> : <div className="empty-state">Select a date range to map curve movement.</div>}
             </>
           ) : null}
         </div>

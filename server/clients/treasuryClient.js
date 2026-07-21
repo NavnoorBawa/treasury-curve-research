@@ -54,7 +54,7 @@ const getNewYorkYear = () => {
   return Number(formatter.format(new Date()));
 };
 
-const fetchWithTimeout = async (url, timeoutMs = 15000) => {
+const fetchTreasuryOnce = async (url, timeoutMs) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -68,13 +68,37 @@ const fetchWithTimeout = async (url, timeoutMs = 15000) => {
     });
 
     if (!response.ok) {
-      throw new Error(`Treasury feed returned ${response.status}`);
+      const error = new Error(`Treasury feed returned ${response.status}`);
+      error.retryable = response.status === 429 || response.status >= 500;
+      throw error;
     }
 
     return await response.text();
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Treasury feed timed out after ${timeoutMs} ms`, { cause: error });
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
   }
+};
+
+const fetchWithTimeout = async (url) => {
+  const attemptTimeouts = [7000, 15000];
+  let lastError;
+
+  for (let index = 0; index < attemptTimeouts.length; index += 1) {
+    try {
+      return await fetchTreasuryOnce(url, attemptTimeouts[index]);
+    } catch (error) {
+      lastError = error;
+      if (error?.retryable === false || index === attemptTimeouts.length - 1) break;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Treasury feed request failed");
 };
 
 const buildYearUrl = (year) => {

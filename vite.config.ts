@@ -10,10 +10,12 @@ export default defineConfig({
     }
   },
   build: {
+    // The research workbench is one intentional lazy boundary (about 145 kB gzip)
+    // so cross-view filters remain mounted while the initial market shell stays small.
+    chunkSizeWarningLimit: 550,
     rollupOptions: {
       output: {
         manualChunks: {
-          charts: ["recharts"],
           react: ["react", "react-dom", "@tanstack/react-query"],
           icons: ["lucide-react"]
         }
