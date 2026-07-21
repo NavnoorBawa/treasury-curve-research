@@ -28,6 +28,7 @@
   --zero-line: rgba(64, 74, 68, 0.5);
   --move-up: #9f6537;
   --move-down: #0f7b5a;
+  --change-up-text: #9f6418;
   --comparison-reference: #6f7a74;
   --comparison-current: #16796f;
   --comparison-secondary: #a86c1b;
@@ -76,6 +77,7 @@
   --zero-line: rgba(190, 201, 195, 0.5);
   --move-up: #d09a64;
   --move-down: #62c89f;
+  --change-up-text: #d3a24e;
   --comparison-reference: #a1aaa5;
   --comparison-current: #56b9aa;
   --comparison-secondary: #d3a24e;
@@ -1203,7 +1205,7 @@ h3 {
   font-weight: 720;
 }
 
-.curve-matrix__change--up { color: var(--series-5y); }
+.curve-matrix__change--up { color: var(--change-up-text); }
 .curve-matrix__change--down { color: var(--series-10y); }
 
 .curve-matrix__item-heading {
