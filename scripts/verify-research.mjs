@@ -182,6 +182,21 @@ assert.equal(weeklyResearch.weekEnd, "2026-07-17");
 assert.ok(weeklyResearch.tableRows.every((item) => item.status === "Official CMT"));
 assert.ok(weeklyResearch.tableRows.every((item) => Object.values(item.yields).every(Number.isFinite)));
 assert.equal(weeklyResearch.weeklyComparisonDate, "2026-07-10", "Weekly change must disclose its prior-Friday comparison date");
+assert.equal(weeklyResearch.yearEndForecast?.asOfDate, "2026-07-17", "Latest-week forecast must use the latest official as-of curve");
+
+const priorWeeklyResearch = buildWeeklyCurveResearch(syntheticRows, pair, "2026-07-08");
+assert.ok(priorWeeklyResearch);
+assert.equal(priorWeeklyResearch.weekStart, "2026-07-06", "A date inside a week must normalize to Monday");
+assert.equal(priorWeeklyResearch.weekEnd, "2026-07-10");
+assert.equal(priorWeeklyResearch.asOf?.date, "2026-07-10", "Historical week-end must use that week's final official observation");
+assert.equal(priorWeeklyResearch.weeklyComparisonDate, "2026-07-03");
+assert.ok(priorWeeklyResearch.tableRows.every((item) => item.status === "Official CMT"));
+assert.equal(priorWeeklyResearch.yearEndForecast?.asOfDate, "2026-07-10", "Historical forecast inputs must be truncated at the selected week");
+assert.ok(priorWeeklyResearch.yearEndForecast?.trainingEndDate < "2026-07-10", "Historical forecast training must not contain later observations");
+
+const futureWeeklyResearch = buildWeeklyCurveResearch(syntheticRows, pair, "2027-01-04");
+assert.ok(futureWeeklyResearch);
+assert.equal(futureWeeklyResearch.weekStart, "2026-07-13", "Future week requests must clamp to the latest available week");
 
 const wednesdayIndex = syntheticRows.findIndex((item) => item.date === "2026-07-15");
 const historyThroughWednesday = syntheticRows.slice(0, wednesdayIndex + 1);
@@ -208,6 +223,8 @@ console.log(
       csvUnitsVerified: true,
       chartSamplingVerified: true,
       weeklyActualOnlyVerified: true,
+      historicalWeekSelectionVerified: true,
+      historicalAsOfTruncationVerified: true,
       missingObservationRuleVerified: true,
       unpublishedDatesBlankVerified: true,
       dnsRandomWalkBenchmarkVerified: true,

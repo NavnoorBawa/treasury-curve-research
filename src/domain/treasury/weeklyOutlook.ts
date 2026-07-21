@@ -34,10 +34,13 @@ export interface WeeklyDeskRow {
 }
 
 export interface WeeklyCurveResearch {
-  asOf: HistoricalRow;
+  asOf: HistoricalRow | null;
   pair: CurvePair;
   weekStart: string;
   weekEnd: string;
+  earliestWeekStart: string;
+  latestWeekStart: string;
+  latestAvailableDate: string;
   tableRows: WeeklyDeskRow[];
   weeklyMove: CurveMove | null;
   weeklyComparisonDate: string | null;
@@ -52,18 +55,13 @@ export interface WeeklyCurveResearch {
 const isNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value);
 
-const completeCurveRows = (rows: HistoricalRow[]) =>
-  rows
-    .filter((row) => maturityKeys.every((key) => isNumber(row[key])))
-    .sort((left, right) => left.date.localeCompare(right.date));
-
 const addDays = (date: Date, days: number) => {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + days);
   return next;
 };
 
-const startOfWeek = (date: string) => {
+export const startOfTreasuryWeek = (date: string) => {
   const value = isoToDate(date);
   const mondayOffset = (value.getUTCDay() + 6) % 7;
   return toIsoDate(addDays(value, -mondayOffset));
@@ -77,6 +75,42 @@ const dayLabel = (date: string) =>
 
 const lastRowBefore = (rows: HistoricalRow[], date: string) =>
   [...rows].reverse().find((row) => row.date < date) ?? null;
+
+const rowSupportsPair = (row: HistoricalRow, pair: CurvePair) =>
+  isNumber(row[pair.shortKey]) && isNumber(row[pair.longKey]);
+
+const isIsoDate = (value: string | null | undefined): value is string => {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+};
+
+export const getWeeklySelectionBounds = (sourceRows: HistoricalRow[], pair: CurvePair) => {
+  const pairRows = sourceRows
+    .filter((row) => rowSupportsPair(row, pair))
+    .sort((left, right) => left.date.localeCompare(right.date));
+  const first = pairRows[0];
+  const last = pairRows.at(-1);
+  if (!first || !last) return null;
+  return {
+    earliestWeekStart: startOfTreasuryWeek(first.date),
+    latestWeekStart: startOfTreasuryWeek(last.date)
+  };
+};
+
+export const normalizeWeeklyWeekStart = (
+  sourceRows: HistoricalRow[],
+  pair: CurvePair,
+  requestedWeekStart?: string | null
+) => {
+  const bounds = getWeeklySelectionBounds(sourceRows, pair);
+  if (!bounds) return null;
+  if (!isIsoDate(requestedWeekStart)) return bounds.latestWeekStart;
+  const normalized = startOfTreasuryWeek(requestedWeekStart);
+  if (normalized < bounds.earliestWeekStart) return bounds.earliestWeekStart;
+  if (normalized > bounds.latestWeekStart) return bounds.latestWeekStart;
+  return normalized;
+};
 
 const previousYearEndRow = (rows: HistoricalRow[], asOf: HistoricalRow) => {
   const previousYear = isoToDate(asOf.date).getUTCFullYear() - 1;
@@ -123,25 +157,31 @@ export const conditionalRegimeInterpretation = (type: CurveMoveClassification, p
 export const buildWeeklyCurveResearch = (
   sourceRows: HistoricalRow[],
   pair: CurvePair,
+  selectedWeekStart?: string | null,
   suppliedYearEndForecast?: YearEndForecast | null
 ): WeeklyCurveResearch | null => {
-  const rows = completeCurveRows(sourceRows);
-  const asOf = rows.at(-1);
-  if (!asOf) return null;
+  const rows = [...sourceRows].sort((left, right) => left.date.localeCompare(right.date));
+  const pairRows = rows.filter((row) => rowSupportsPair(row, pair));
+  const bounds = getWeeklySelectionBounds(pairRows, pair);
+  const latestAvailableDate = rows.at(-1)?.date;
+  if (!bounds || !latestAvailableDate) return null;
 
-  const weekStart = startOfWeek(asOf.date);
+  const weekStart = normalizeWeeklyWeekStart(pairRows, pair, selectedWeekStart);
+  if (!weekStart) return null;
   const weekDates = weekdayDates(weekStart);
   const weekEnd = weekDates.at(-1) ?? weekStart;
   const rowsByDate = new Map(rows.map((row) => [row.date, row]));
+  const asOf = pairRows.filter((row) => row.date >= weekStart && row.date <= weekEnd).at(-1) ?? null;
   const tableRows = weekDates.map((date): WeeklyDeskRow => {
     const observed = rowsByDate.get(date) ?? null;
-    const reference = observed ? lastRowBefore(rows, date) : null;
-    const move = observed && reference
-      ? buildCurveMove(reference, observed, pair, DAILY_REGIME_TOLERANCE_BPS)
+    const pairObservation = observed && rowSupportsPair(observed, pair) ? observed : null;
+    const reference = pairObservation ? lastRowBefore(pairRows, date) : null;
+    const move = pairObservation && reference
+      ? buildCurveMove(reference, pairObservation, pair, DAILY_REGIME_TOLERANCE_BPS)
       : null;
     const status: WeeklyRowStatus = observed
       ? "Official CMT"
-      : date <= asOf.date
+      : date <= latestAvailableDate
         ? "No official observation"
         : "Not yet published";
 
@@ -153,7 +193,7 @@ export const buildWeeklyCurveResearch = (
         key,
         observed && isNumber(observed[key]) ? Number(observed[key]) : null
       ])) as Record<ResearchMaturityKey, number | null>,
-      spreadBps: observed ? currentSpreadForPair(observed, pair) : null,
+      spreadBps: pairObservation ? currentSpreadForPair(pairObservation, pair) : null,
       levelDeltaBps: move?.levelDeltaBps ?? null,
       spreadDeltaBps: move?.spreadDeltaBps ?? null,
       regime: move?.type ?? null,
@@ -161,18 +201,22 @@ export const buildWeeklyCurveResearch = (
     };
   });
 
-  const weeklyReference = lastRowBefore(rows, weekStart);
-  const weeklyMove = weeklyReference
+  const weeklyReference = lastRowBefore(pairRows, weekStart);
+  const weeklyMove = weeklyReference && asOf
     ? buildCurveMove(weeklyReference, asOf, pair, WEEKLY_REGIME_TOLERANCE_BPS)
     : null;
-  const yearStart = previousYearEndRow(rows, asOf);
-  const yearToDateMove = yearStart
+  const yearStart = asOf ? previousYearEndRow(pairRows, asOf) : null;
+  const yearToDateMove = yearStart && asOf
     ? buildCurveMove(yearStart, asOf, pair, YEAR_END_REGIME_TOLERANCE_BPS)
     : null;
-  const yearEndForecast = suppliedYearEndForecast === undefined
-    ? buildYearEndForecast(rows)
-    : suppliedYearEndForecast;
-  const yearEndMove = yearEndForecast
+  const rowsThroughAsOf = asOf ? rows.filter((row) => row.date <= asOf.date) : [];
+  const asOfHasCompleteCurve = asOf ? maturityKeys.every((key) => isNumber(asOf[key])) : false;
+  const yearEndForecast = asOfHasCompleteCurve
+    ? suppliedYearEndForecast && suppliedYearEndForecast.asOfDate === asOf?.date
+      ? suppliedYearEndForecast
+      : buildYearEndForecast(rowsThroughAsOf)
+    : null;
+  const yearEndMove = yearEndForecast && asOf
     ? buildCurveMove(asOf, rowFromYearEndForecast(yearEndForecast), pair, YEAR_END_REGIME_TOLERANCE_BPS)
     : null;
 
@@ -181,10 +225,13 @@ export const buildWeeklyCurveResearch = (
     pair,
     weekStart,
     weekEnd,
+    earliestWeekStart: bounds.earliestWeekStart,
+    latestWeekStart: bounds.latestWeekStart,
+    latestAvailableDate,
     tableRows,
     weeklyMove,
     weeklyComparisonDate: weeklyReference?.date ?? null,
-    currentSpreadBps: currentSpreadForPair(asOf, pair),
+    currentSpreadBps: asOf ? currentSpreadForPair(asOf, pair) : null,
     yearToDateMove,
     yearToDateStart: yearStart?.date ?? null,
     yearEndMove,

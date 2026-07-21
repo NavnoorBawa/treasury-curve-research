@@ -1,5 +1,5 @@
 import { useMemo, type CSSProperties } from "react";
-import { CalendarDays, CircleGauge, Database, Info, ShieldCheck } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, CircleGauge, Database, Info, ShieldCheck } from "lucide-react";
 import {
   curvePairs,
   maturityKeys,
@@ -57,17 +57,25 @@ const MoveSummary = ({ move }: { move: CurveMove | null }) => (
 const metric = (value: number | null, suffix = " bps") =>
   typeof value === "number" ? `${value.toFixed(1)}${suffix}` : "n/a";
 
+const shiftWeek = (weekStart: string, days: number) => {
+  const date = new Date(`${weekStart}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+};
+
 interface WeeklyCurveOutlookProps {
   rows: HistoricalRow[];
   pair: CurvePair;
+  selectedWeekStart: string;
   onPairChange: (key: SpreadKey) => void;
+  onWeekStartChange: (weekStart: string) => void;
 }
 
-export function WeeklyCurveOutlook({ rows, pair, onPairChange }: WeeklyCurveOutlookProps) {
+export function WeeklyCurveOutlook({ rows, pair, selectedWeekStart, onPairChange, onWeekStartChange }: WeeklyCurveOutlookProps) {
   const yearEndModel = useMemo(() => buildYearEndForecast(rows), [rows]);
   const research = useMemo(
-    () => buildWeeklyCurveResearch(rows, pair, yearEndModel),
-    [pair, rows, yearEndModel]
+    () => buildWeeklyCurveResearch(rows, pair, selectedWeekStart, yearEndModel),
+    [pair, rows, selectedWeekStart, yearEndModel]
   );
 
   if (!research) {
@@ -75,7 +83,12 @@ export function WeeklyCurveOutlook({ rows, pair, onPairChange }: WeeklyCurveOutl
   }
 
   const { yearEndForecast, yearEndMove } = research;
+  const selectedAsOf = research.asOf;
   const diagnostics = yearEndForecast?.diagnostics;
+  const isLatestWeek = research.weekStart === research.latestWeekStart;
+  const selectWeek = (weekStart: string) => {
+    onWeekStartChange(weekStart === research.latestWeekStart ? "" : weekStart);
+  };
 
   return (
     <article className="panel weekly-desk">
@@ -86,9 +99,59 @@ export function WeeklyCurveOutlook({ rows, pair, onPairChange }: WeeklyCurveOutl
           <p>Published Treasury CMT observations only. Missing and unpublished dates remain blank rather than being estimated.</p>
         </div>
         <div className="weekly-desk__asof">
-          <span>Latest official observation</span>
-          <strong>{formatDate(research.asOf.date)}</strong>
+          <span>Selected week-end observation</span>
+          <strong>{research.asOf ? formatDate(research.asOf.date) : `No ${pair.label} observation`}</strong>
         </div>
+      </div>
+
+      <div className="weekly-week-control" role="group" aria-label="Historical week selection">
+        <div className="weekly-week-control__field">
+          <label htmlFor="weekly-week-start">Week starting Monday</label>
+          <div className="weekly-week-control__actions">
+            <button
+              className="weekly-week-control__nav"
+              type="button"
+              aria-label="Show previous week"
+              title="Previous week"
+              disabled={research.weekStart <= research.earliestWeekStart}
+              onClick={() => selectWeek(shiftWeek(research.weekStart, -7))}
+            >
+              <ChevronLeft size={17} aria-hidden="true" />
+            </button>
+            <input
+              id="weekly-week-start"
+              type="date"
+              step={7}
+              min={research.earliestWeekStart}
+              max={research.latestWeekStart}
+              value={research.weekStart}
+              onInput={(event) => event.currentTarget.value && selectWeek(event.currentTarget.value)}
+            />
+            <button
+              className="weekly-week-control__nav"
+              type="button"
+              aria-label="Show next week"
+              title="Next week"
+              disabled={isLatestWeek}
+              onClick={() => selectWeek(shiftWeek(research.weekStart, 7))}
+            >
+              <ChevronRight size={17} aria-hidden="true" />
+            </button>
+            <button
+              className="weekly-week-control__latest"
+              type="button"
+              disabled={isLatestWeek}
+              onClick={() => onWeekStartChange("")}
+            >
+              Latest week
+            </button>
+          </div>
+        </div>
+        <span className="weekly-week-control__context">
+          {isLatestWeek
+            ? `Latest available week · source through ${formatDate(research.latestAvailableDate)}`
+            : `Historical as-of view · later observations excluded`}
+        </span>
       </div>
 
       <div className="weekly-pair-control">
@@ -110,20 +173,30 @@ export function WeeklyCurveOutlook({ rows, pair, onPairChange }: WeeklyCurveOutl
 
       <section className="weekly-summary-grid" aria-label="Observed curve movement summary">
         <div className="weekly-summary">
-          <span>Latest week · actual change</span>
-          <strong>{research.weeklyComparisonDate ? `${formatDate(research.weeklyComparisonDate)} → ${formatDate(research.asOf.date)}` : formatDate(research.asOf.date)}</strong>
+          <span>Selected week · actual change</span>
+          <strong>{research.asOf
+            ? research.weeklyComparisonDate
+              ? `${formatDate(research.weeklyComparisonDate)} → ${formatDate(research.asOf.date)}`
+              : formatDate(research.asOf.date)
+            : `No ${pair.label} observation`}</strong>
           <MoveSummary move={research.weeklyMove} />
         </div>
         <div className="weekly-summary">
-          <span>Latest {pair.label} spread</span>
+          <span>Selected week-end {pair.label} spread</span>
           <strong>{typeof research.currentSpreadBps === "number" ? `${research.currentSpreadBps.toFixed(1)} bps` : "n/a"}</strong>
-          <span className="weekly-summary__numbers">
-            {pair.shortKey} {formatYield(Number(research.asOf[pair.shortKey]))} · {pair.longKey} {formatYield(Number(research.asOf[pair.longKey]))}
-          </span>
+          {research.asOf ? (
+            <span className="weekly-summary__numbers">
+              {pair.shortKey} {formatYield(Number(research.asOf[pair.shortKey]))} · {pair.longKey} {formatYield(Number(research.asOf[pair.longKey]))}
+            </span>
+          ) : <span className="weekly-summary__empty">No pair observation in this week</span>}
         </div>
         <div className="weekly-summary">
-          <span>Year to date · actual change</span>
-          <strong>{research.yearToDateStart ? `${formatDate(research.yearToDateStart)} → ${formatDate(research.asOf.date)}` : formatDate(research.asOf.date)}</strong>
+          <span>Year to selected date · actual change</span>
+          <strong>{research.asOf
+            ? research.yearToDateStart
+              ? `${formatDate(research.yearToDateStart)} → ${formatDate(research.asOf.date)}`
+              : formatDate(research.asOf.date)
+            : "No selected as-of observation"}</strong>
           <MoveSummary move={research.yearToDateMove} />
         </div>
       </section>
@@ -133,7 +206,7 @@ export function WeeklyCurveOutlook({ rows, pair, onPairChange }: WeeklyCurveOutl
           <CalendarDays size={16} aria-hidden="true" />
           <strong>Week of {formatDate(research.weekStart)}</strong>
         </div>
-        <span>Official observations through {formatDate(research.asOf.date)} · no forward-filled values</span>
+        <span>Official source records through {formatDate(research.latestAvailableDate)} · no forward-filled values</span>
       </div>
 
       <div className="weekly-table-wrap">
@@ -186,13 +259,13 @@ export function WeeklyCurveOutlook({ rows, pair, onPairChange }: WeeklyCurveOutl
       <section className="year-end-outlook" aria-label="Year-end statistical yield outlook">
         <div className="year-end-outlook__header">
           <div>
-            <p className="eyebrow">Modeled scenario · separate from official data</p>
+            <p className="eyebrow">Modeled scenario{research.asOf ? ` · as of ${formatDate(research.asOf.date)}` : ""} · separate from official data</p>
             <h3>Year-end statistical baseline · {yearEndForecast ? formatDate(yearEndForecast.targetDate) : "unavailable"}</h3>
           </div>
           {yearEndForecast ? <span className="forecast-confidence">DNS + random walk</span> : null}
         </div>
 
-        {yearEndForecast && yearEndMove ? (
+        {yearEndForecast && yearEndMove && selectedAsOf ? (
           <>
             <div className="year-end-yields">
               {maturityKeys.map((key: ResearchMaturityKey) => (
@@ -200,7 +273,7 @@ export function WeeklyCurveOutlook({ rows, pair, onPairChange }: WeeklyCurveOutl
                   <span>{key} CMT model median</span>
                   <strong>{formatYield(yearEndForecast.yields[key].median)}</strong>
                   <small>Empirical 20–80 band: {formatYield(yearEndForecast.yields[key].low)}–{formatYield(yearEndForecast.yields[key].high)}</small>
-                  <em>Latest actual: {formatYield(Number(research.asOf[key]))}</em>
+                  <em>Selected as-of actual: {formatYield(Number(selectedAsOf[key]))}</em>
                 </div>
               ))}
             </div>
@@ -245,6 +318,7 @@ export function WeeklyCurveOutlook({ rows, pair, onPairChange }: WeeklyCurveOutl
                 <p><strong>Curve model.</strong> The model uses Dynamic Nelson-Siegel as a descriptive factor approximation to the four 2Y, 5Y, 10Y, and 30Y CMT par-rate points. It uses the standard fixed monthly decay parameter λ = {DNS_DECAY_PER_MONTH} and independently estimated AR(1) factor dynamics; it is not a fitted zero-coupon or no-arbitrage curve.</p>
                 <p><strong>Benchmark and combination.</strong> The DNS forecast is combined with a no-change random-walk benchmark. Weights are inverse-MAE weights learned only from prior rolling-origin errors and bounded between 20% and 80%. The final displayed weight uses up to {YEAR_END_BACKTEST_ORIGINS} recent historical origins.</p>
                 <p><strong>Training and intervals.</strong> Factor dynamics use up to {YEAR_END_TRAINING_MONTHS} completed month-end curves ({formatDate(yearEndForecast.trainingStartDate)}–{formatDate(yearEndForecast.trainingEndDate)}). Displayed bands are the 20th and 80th percentiles of prior rolling ensemble residuals; they are not guaranteed confidence intervals.</p>
+                <p><strong>Historical as-of discipline.</strong> Selecting an earlier week truncates all model inputs at that week&apos;s final available {pair.label} observation. Later yields, model errors, and regime outcomes are excluded to prevent look-ahead bias.</p>
                 <p><strong>Scope.</strong> This is a yield-only statistical baseline, not a trade recommendation or a discretionary macro forecast. It does not include OIS/SOFR forwards, inflation swaps, survey expectations, Treasury supply, term-premium estimates, positioning, or event scenarios. A professional investment process should challenge the baseline with those inputs.</p>
                 <p className="year-end-methodology__sources">
                   Research basis: <a href="https://www.nber.org/papers/w10048" target="_blank" rel="noreferrer">Diebold–Li Dynamic Nelson-Siegel</a> · <a href="https://www.federalreserve.gov/pubs/ifdp/2010/993/ifdp993.htm" target="_blank" rel="noreferrer">Federal Reserve yield-forecast combination evidence</a> · <a href="https://home.treasury.gov/policy-issues/financing-the-government/interest-rate-statistics/treasury-yield-curve-methodology" target="_blank" rel="noreferrer">Treasury CMT methodology</a>
@@ -253,7 +327,7 @@ export function WeeklyCurveOutlook({ rows, pair, onPairChange }: WeeklyCurveOutl
             </details>
           </>
         ) : (
-          <div className="empty-state">The completed monthly history is insufficient to estimate and validate a year-end baseline.</div>
+          <div className="empty-state">No year-end baseline is available for this selected week. A complete four-tenor as-of curve and sufficient pre-as-of monthly history are required.</div>
         )}
       </section>
 

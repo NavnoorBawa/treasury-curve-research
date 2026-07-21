@@ -13,13 +13,17 @@ const queryClient = new QueryClient({
   }
 });
 
+const analyticsEnabled = window.location.protocol === "https:"
+  && window.location.hostname !== "localhost"
+  && window.location.hostname !== "127.0.0.1";
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <AppErrorBoundary>
         <App />
       </AppErrorBoundary>
-      <Analytics />
+      {analyticsEnabled ? <Analytics /> : null}
     </QueryClientProvider>
   </React.StrictMode>
 );

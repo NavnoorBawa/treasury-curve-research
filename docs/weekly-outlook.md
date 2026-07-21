@@ -17,13 +17,15 @@ The CMT curve is a once-daily official par curve, not an executable close or an 
 
 ## Actual Weekly Table
 
-The table displays the latest calendar week containing the latest official observation:
+The table defaults to the calendar week containing the latest official observation. Previous/next controls and the Monday date field can select any supported historical week. Non-latest selections are preserved in shareable URLs as `?view=weekly&week=YYYY-MM-DD`:
 
 - `Official CMT` means the cell comes directly from the normalized official history.
 - `No official observation` means a past weekday has no official record, normally because of a market holiday or source-level missing value. No value is imputed.
 - `Not yet published` means the date is later than the latest official record. Every yield and derived field remains blank.
 - Daily changes compare an observed row with the immediately preceding available official observation. A Monday normally compares with Friday; the observation after a holiday skips the blank date.
-- The weekly summary compares the latest observation with the final official observation before that calendar week and discloses both dates.
+- The weekly summary compares the selected week's final pair observation with the final available pair observation before that calendar week and discloses both dates.
+- A historical selection is a true as-of view: selected-week, year-to-date, and year-end calculations exclude every observation after that week's final available pair observation.
+- If the selected pair has no complete observation in a historical week, the table still shows any maturity values published by H.15, while pair summaries and the year-end baseline remain explicitly unavailable.
 
 There is no daily or Friday forecast in this table.
 
@@ -59,9 +61,9 @@ The implementation follows the three-factor Dynamic Nelson-Siegel structure desc
 - the standard fixed monthly decay parameter is `lambda = 0.0609`;
 - each factor follows an independently estimated AR(1) process;
 - factor dynamics use at most 240 contiguous completed month-end curves and never bridge a missing calendar month as one transition;
-- the current official daily curve supplies the forecast origin.
+- the selected week's final complete official daily curve supplies the forecast origin.
 
-The horizon is the calendar distance from the latest observation to the final weekday of the year, rounded to the nearest whole model month. Using DNS directly as a descriptive approximation to four CMT par-rate points is intentionally parsimonious; it is not equivalent to fitting a full institutional zero-coupon or no-arbitrage curve.
+The horizon is the calendar distance from the selected as-of observation to the final weekday of that year, rounded to the nearest whole model month. Using DNS directly as a descriptive approximation to four CMT par-rate points is intentionally parsimonious; it is not equivalent to fitting a full institutional zero-coupon or no-arbitrage curve.
 
 ### Random-walk benchmark and combination
 
@@ -85,7 +87,7 @@ Every rolling forecast follows this order:
 fit through origin t -> estimate weights from errors known before t -> forecast t+h -> score against realized t+h
 ```
 
-The actual outcome at `t+h` is used only after the forecast is formed. Final current-origin model weights use only historical forecasts whose outcomes are already observed.
+The actual outcome at `t+h` is used only after the forecast is formed. Final as-of-origin model weights use only historical forecasts whose outcomes were already observed at that origin. Selecting an older week truncates the source rows before model fitting, rolling-error estimation, curve classification, and year-to-date calculation; later data never enters the historical result.
 
 ## Interpretation and Limitations
 

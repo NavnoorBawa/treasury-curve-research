@@ -965,6 +965,7 @@ h3 {
 }
 
 .weekly-desk__toolbar,
+.weekly-week-control,
 .weekly-pair-control,
 .weekly-table-heading,
 .year-end-outlook,
@@ -1007,6 +1008,89 @@ h3 {
   font-family: var(--font-number);
   font-size: var(--text-small);
   font-weight: 650;
+}
+
+.weekly-week-control {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-block: 9px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.weekly-week-control__field {
+  display: grid;
+  gap: 5px;
+}
+
+.weekly-week-control__field > label {
+  color: var(--subtle);
+  font-size: var(--text-micro);
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.weekly-week-control__actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.weekly-week-control__actions input {
+  width: 154px;
+  min-height: 38px;
+  padding: 6px 9px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-number);
+  font-size: var(--text-small);
+  font-weight: 650;
+}
+
+.weekly-week-control__nav,
+.weekly-week-control__latest {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--surface-raised);
+  color: var(--ink);
+}
+
+.weekly-week-control__nav {
+  display: inline-flex;
+  width: 38px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.weekly-week-control__latest {
+  padding-inline: 11px;
+  font-size: var(--text-small);
+  font-weight: 680;
+}
+
+.weekly-week-control__nav:not(:disabled):hover,
+.weekly-week-control__latest:not(:disabled):hover {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+}
+
+.weekly-week-control__nav:disabled,
+.weekly-week-control__latest:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.weekly-week-control__context {
+  padding-bottom: 8px;
+  color: var(--subtle);
+  font-size: var(--text-caption);
+  text-align: right;
 }
 
 .weekly-pair-control {
@@ -1538,6 +1622,7 @@ h3 {
 
 @media (max-width: 700px) {
   .weekly-desk__toolbar,
+  .weekly-week-control,
   .weekly-pair-control,
   .weekly-table-heading,
   .year-end-outlook,
@@ -1547,6 +1632,7 @@ h3 {
   }
 
   .weekly-desk__toolbar,
+  .weekly-week-control,
   .weekly-table-heading {
     align-items: flex-start;
     flex-direction: column;
@@ -1555,6 +1641,19 @@ h3 {
 
   .weekly-desk__asof {
     justify-items: start;
+  }
+
+  .weekly-week-control {
+    align-items: flex-start;
+  }
+
+  .weekly-week-control__actions {
+    flex-wrap: wrap;
+  }
+
+  .weekly-week-control__context {
+    padding-bottom: 0;
+    text-align: left;
   }
 
   .weekly-pair-control {

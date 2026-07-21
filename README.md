@@ -45,9 +45,9 @@ This gives reliable long-run daily history back to the earliest available H.15 o
 
 - Long-run historical data for 2Y, 5Y, 10Y, and 30Y Treasury yields.
 - Trader-style workspace tabs: Market, Weekly, Compare, History, Events, and Regimes. Only the active view is shown, avoiding a stacked-scroll layout. The delayed Futures implementation remains analytically isolated and can be re-enabled separately.
-- A local Weekly view with Monday-Friday official observations only, explicit blank holiday/unpublished rows, selected-pair daily regimes, actual latest-week and year-to-date diagnoses, and a separately labeled year-end Dynamic Nelson-Siegel/random-walk baseline. The year-end section reports rolling-origin benchmark errors, model weights, and empirical predictive bands. No forecast enters official datasets or exports. See [docs/weekly-outlook.md](./docs/weekly-outlook.md).
+- A Weekly view with Monday-Friday official observations only, explicit blank holiday/unpublished rows, selected-pair daily regimes, and previous/next or direct historical week selection. Historical `?week=YYYY-MM-DD` views recalculate week, year-to-date, and year-end analytics using only observations available through that selected week. The separately labeled Dynamic Nelson-Siegel/random-walk baseline reports rolling-origin benchmark errors, model weights, and empirical predictive bands; no forecast enters official datasets or exports. See [docs/weekly-outlook.md](./docs/weekly-outlook.md).
 - An optional delayed CBOT Treasury-futures implementation for `ZT=F`, `ZF=F`, `ZN=F`, and `UB=F`, hidden from current production navigation. It retains per-contract trade date and freshness, verified session range, conditional prior-session comparisons in 32nds, quote timestamps, and explicit inverse price/yield direction. Futures data remains isolated from every official CMT calculation, spread, regime, statistic, forecast, and export.
-- Validated shareable workspace URLs preserve the active view and relevant range, dates, spread, curve pair, history section, and weekly/monthly interval. The Copy view action writes the normalized setup URL to the clipboard; malformed or out-of-sample parameters fall back to valid H.15 dates and supported controls.
+- Validated shareable workspace URLs preserve the active view and relevant range, dates, selected historical week, spread, curve pair, history section, and weekly/monthly interval. The Copy view action writes the normalized setup URL to the clipboard; malformed or out-of-sample parameters fall back to valid H.15 dates and supported controls.
 - Date-range presets: 1Y, 5Y, 10Y, 20Y, Max, plus custom start/end dates.
 - Six core 2Y/5Y/10Y/30Y curve combinations: 5Y-2Y, 10Y-2Y, 30Y-2Y, 10Y-5Y, 30Y-5Y, and 30Y-10Y.
 - Date-to-date yield curve comparison with custom as-of/reference dates and 1W, 1M, 1Y, and range-start shortcuts.
@@ -205,7 +205,7 @@ The production deployment includes:
 
 Security headers are configured in `vercel.json` for Vercel and through Helmet for the local Express production server. The app has no required secrets or API keys.
 
-Vercel Web Analytics is enabled for aggregate launch monitoring. The React integration is cookieless and does not add an application-level user identifier; analytics requests remain subject to Vercel's service and privacy terms. No financial input, portfolio data, or user account data is collected by this application.
+Vercel Web Analytics is enabled on HTTPS non-local deployments for aggregate launch monitoring and is intentionally disabled on localhost. The React integration is cookieless and does not add an application-level user identifier; analytics requests remain subject to Vercel's service and privacy terms. No financial input, portfolio data, or user account data is collected by this application.
 
 The Vercel project is connected to the GitHub `main` branch. A push to `main` creates a production deployment; other branches can be used for preview deployments. A manual production deployment is also available:
 

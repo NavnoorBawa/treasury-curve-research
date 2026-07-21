@@ -35,6 +35,7 @@ import { TreasuryFuturesWorkspace } from "@/features/futures/TreasuryFuturesWork
 import { CurveMatrix } from "@/features/market/CurveMatrix";
 import { YieldCurveChart } from "@/features/market/YieldCurveChart";
 import { WeeklyCurveOutlook } from "@/features/weekly/WeeklyCurveOutlook";
+import { normalizeWeeklyWeekStart } from "@/domain/treasury/weeklyOutlook";
 import { YieldCurveComparison } from "./YieldCurveComparison";
 import { useHistoricalYields } from "./useHistoricalYields";
 import { formatBps, formatDate, formatShortDate, formatTimestamp, formatYield } from "@/utils/format";
@@ -95,9 +96,10 @@ interface InitialWorkspaceState {
   comparisonAsOf: string;
   comparisonReference: string;
   comparisonReference2: string;
+  weeklyWeekStart: string;
 }
 
-const workspaceStateQueryKeys = ["view", "range", "from", "to", "section", "spread", "pair", "interval", "asof", "ref", "ref2"];
+const workspaceStateQueryKeys = ["view", "range", "from", "to", "section", "spread", "pair", "interval", "asof", "ref", "ref2", "week"];
 
 const workspaceTabFromQuery: Record<string, WorkspaceTab> = {
   market: "snapshot",
@@ -144,7 +146,8 @@ const readWorkspaceState = (): InitialWorkspaceState => {
       regimeHorizon: "1M",
       comparisonAsOf: "",
       comparisonReference: "",
-      comparisonReference2: ""
+      comparisonReference2: "",
+      weeklyWeekStart: ""
     };
   }
 
@@ -175,7 +178,8 @@ const readWorkspaceState = (): InitialWorkspaceState => {
     regimeHorizon: interval === "weekly" || interval === "1w" ? "1W" : "1M",
     comparisonAsOf: isIsoDate(params.get("asof")) ? params.get("asof") as string : "",
     comparisonReference: isIsoDate(params.get("ref")) ? params.get("ref") as string : "",
-    comparisonReference2: isIsoDate(params.get("ref2")) ? params.get("ref2") as string : ""
+    comparisonReference2: isIsoDate(params.get("ref2")) ? params.get("ref2") as string : "",
+    weeklyWeekStart: isIsoDate(params.get("week")) ? params.get("week") as string : ""
   };
 };
 
@@ -283,6 +287,7 @@ export function ResearchWorkbench({ currentData, currentLoading, currentError, o
   const [comparisonAsOf, setComparisonAsOf] = useState(initialWorkspaceState.comparisonAsOf);
   const [comparisonReference, setComparisonReference] = useState(initialWorkspaceState.comparisonReference);
   const [comparisonReference2, setComparisonReference2] = useState(initialWorkspaceState.comparisonReference2);
+  const [weeklyWeekStart, setWeeklyWeekStart] = useState(initialWorkspaceState.weeklyWeekStart);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "error">("idle");
   const [showEventMarkers, setShowEventMarkers] = useState(true);
   const [pinnedEventId, setPinnedEventId] = useState<string | null>(null);
@@ -326,6 +331,15 @@ export function ResearchWorkbench({ currentData, currentLoading, currentError, o
   }, [comparisonAsOf, comparisonReference, comparisonReference2, historicalRows, preset, range.end, range.start]);
 
   useEffect(() => {
+    if (activeTab !== "weekly" || !historicalRows?.length || !weeklyWeekStart) return;
+    const pair = curvePairs.find((item) => item.key === selectedPairKey) ?? curvePairs[1];
+    const normalizedWeekStart = normalizeWeeklyWeekStart(historicalRows, pair, weeklyWeekStart);
+    const latestWeekStart = normalizeWeeklyWeekStart(historicalRows, pair);
+    const canonicalWeekStart = normalizedWeekStart === latestWeekStart ? "" : normalizedWeekStart;
+    if (canonicalWeekStart !== null && canonicalWeekStart !== weeklyWeekStart) setWeeklyWeekStart(canonicalWeekStart);
+  }, [activeTab, historicalRows, selectedPairKey, weeklyWeekStart]);
+
+  useEffect(() => {
     const url = new URL(window.location.href);
     workspaceStateQueryKeys.forEach((key) => url.searchParams.delete(key));
 
@@ -349,6 +363,7 @@ export function ResearchWorkbench({ currentData, currentLoading, currentError, o
     if (activeTab === "regimes" || activeTab === "weekly") {
       if (selectedPairKey !== "10Y2Y") url.searchParams.set("pair", selectedPairKey);
       if (activeTab === "regimes" && regimeHorizon === "1W") url.searchParams.set("interval", "weekly");
+      if (activeTab === "weekly" && weeklyWeekStart) url.searchParams.set("week", weeklyWeekStart);
     }
 
     if (activeTab === "comparison") {
@@ -363,7 +378,7 @@ export function ResearchWorkbench({ currentData, currentLoading, currentError, o
     document.title = activeTab === "snapshot"
       ? "U.S. Treasury Curve Research"
       : `${activeLabel} · U.S. Treasury Curve Research`;
-  }, [activeTab, comparisonAsOf, comparisonReference, comparisonReference2, historyView, preset, range.end, range.start, regimeHorizon, selectedPairKey, selectedSpread]);
+  }, [activeTab, comparisonAsOf, comparisonReference, comparisonReference2, historyView, preset, range.end, range.start, regimeHorizon, selectedPairKey, selectedSpread, weeklyWeekStart]);
 
   useEffect(() => {
     if (copyStatus === "idle") return undefined;
@@ -826,7 +841,7 @@ export function ResearchWorkbench({ currentData, currentLoading, currentError, o
             </>
           ) : null}
 
-          {activeTab === "weekly" ? <WeeklyCurveOutlook rows={data.rows} pair={selectedPair} onPairChange={setSelectedPairKey} /> : null}
+          {activeTab === "weekly" ? <WeeklyCurveOutlook rows={data.rows} pair={selectedPair} selectedWeekStart={weeklyWeekStart} onPairChange={setSelectedPairKey} onWeekStartChange={setWeeklyWeekStart} /> : null}
 
           {activeTab === "history" || activeTab === "events" || activeTab === "regimes" ? renderResearchControls() : null}
 
